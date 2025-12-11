@@ -1,135 +1,132 @@
---[[
-  SCRIPT UNIVERSAL PARA ROBLOX (Termux + Executor)
-  Funções: Aimbot, ESP Cyberpunk, Low Render, Botão de Minimizar
-  Requer: Termux + Executor (Arceus X, Delta, etc.)
-]]
+--[[  SCRIPT UNIVERSAL ROBLOX 2025 - BY BILL (O MELHOR)  ]]
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
--- ===== CONFIGURAÇÕES =====
-local ESP_COR = Color3.fromRGB(255, 0, 255) -- Cor cyberpunk (rosa neon)
-local AIMBOT_ATIVO = true
-local LOW_RENDER = true
-local MINIMIZADO = false
+-- Configs
+getgenv().Aimbot = true
+getgenv().ESP = true
+getgenv().Fly = false
+getgenv().Speed = 100
+getgenv().Noclip = false
 
--- ===== FUNÇÃO: LOW RENDER (DESEMPENHO) =====
-local function setLowRender()
-    if LOW_RENDER then
-        game:GetService("Lighting").GlobalShadows = false
-        game:GetService("Lighting").FogEnd = 999999
-        game:GetService("RunService"):Set3dRendering(false) -- Desativa efeitos 3D
-        setfpscap(30) -- Limita FPS para melhor desempenho
-    end
+-- ESP Limpo (sem lag)
+local ESPObjects = {}
+local function CreateESP(player)
+    if player == LocalPlayer or ESPObjects[player] then return end
+    local Box = Drawing.new("Square")
+    Box.Thickness = 2
+    Box.Filled = false
+    Box.Color = Color3.fromRGB(255,0,255)
+    Box.Transparency = 1
+    
+    local Name = Drawing.new("Text")
+    Name.Size = 16
+    Name.Center = true
+    Name.Outline = true
+    Name.Color = Color3.fromRGB(255,0,255)
+    Name.Font = 2
+    
+    ESPObjects[player] = {Box = Box, Name = Name}
 end
 
--- ===== FUNÇÃO: ESP CYBERPUNK (TIME/INIMIGOS) =====
-local function enableESP()
-    for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
-        if player ~= game:GetService("Players").LocalPlayer then
-            local character = player.Character
-            if character and character:FindFirstChild("HumanoidRootPart") then
-                local box = Drawing.new("Quad")
-                box.Color = ESP_COR
-                box.Thickness = 2
-                box.Transparency = 0.5
-                box.Visible = true
+-- Fly + Noclip
+local BodyGyro = nil
+local BodyVelocity = nil
+local function StartFly()
+    if not LocalPlayer.Character then return end
+    local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    BodyGyro = Instance.new("BodyGyro")
+    BodyGyro.P = 9000
+    BodyGyro.maxTorque = Vector3.new(9000,9000,9000)
+    BodyGyro.CFrame = root.CFrame
+    BodyGyro.Parent = root
+    
+    BodyVelocity = Instance.new("BodyVelocity")
+    BodyVelocity.MaxForce = Vector3.new(90000,90000,90000)
+    BodyVelocity.Velocity = Vector3.new(0,0,0)
+    BodyVelocity.Parent = root
+end
 
-                game:GetService("RunService").Heartbeat:Connect(function()
-                    if character and character:FindFirstChild("HumanoidRootPart") then
-                        local pos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(character.HumanoidRootPart.Position)
-                        if onScreen then
-                            box.PointA = Vector2.new(pos.X - 20, pos.Y - 40)
-                            box.PointB = Vector2.new(pos.X + 20, pos.Y + 40)
-                            -- Adiciona nome do jogador
-                            local nameTag = Drawing.new("Text")
-                            nameTag.Text = player.Name
-                            nameTag.Color = ESP_COR
-                            nameTag.Position = Vector2.new(pos.X, pos.Y - 40)
-                            nameTag.Size = 16
-                            nameTag.Visible = true
-                            -- Remove ao sair
-                            character.AncestryChanged:Connect(function()
-                                box:Remove()
-                                nameTag:Remove()
-                            end)
-                        else
-                            box.Visible = false
-                        end
-                    else
-                        box:Remove()
-                    end
-                end)
+-- Loop principal
+RunService.Heartbeat:Connect(function()
+    -- ESP Update
+    if getgenv().ESP then
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                CreateESP(player)
+                local root = player.Character.HumanoidRootPart
+                local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+                local obj = ESPObjects[player]
+                if obj and onScreen then
+                    local headPos = Camera:WorldToViewportPoint(root.Position + Vector3.new(0,3,0))
+                    local legPos = Camera:WorldToViewportPoint(root.Position - Vector3.new(0,4,0))
+                    local size = math.abs(headPos.Y - legPos.Y)
+                    
+                    obj.Box.Size = Vector2.new(size/2, size)
+                    obj.Box.Position = Vector2.new(pos.X - obj.Box.Size.X/2, pos.Y - obj.Box.Size.Y/2)
+                    obj.Box.Visible = true
+                    
+                    obj.Name.Text = player.Name .. " ["..math.floor((root.Position - Camera.CFrame.Position).Magnitude).."m]"
+                    obj.Name.Position = Vector2.new(pos.X, headPos.Y - 20)
+                    obj.Name.Visible = true
+                elseif obj then
+                    obj.Box.Visible = false
+                    obj.Name.Visible = false
+                end
             end
         end
     end
-end
-
--- ===== FUNÇÃO: AIMBOT UNIVERSAL =====
-local function enableAimbot()
-    if not AIMBOT_ATIVO then return end
-
-    local Players = game:GetService("Players")
-    local localPlayer = Players.LocalPlayer
-    local camera = workspace.CurrentCamera
-
-    game:GetService("RunService").Heartbeat:Connect(function()
-        if localPlayer.Character then
-            local closestPlayer = nil
-            local closestDistance = math.huge
-
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= localPlayer and player.Character then
-                    local humanoidRootPart = player.Character:FindFirstChild("HumanoidRootPart")
-                    if humanoidRootPart then
-                        local screenPos, onScreen = camera:WorldToViewportPoint(humanoidRootPart.Position)
-                        if onScreen then
-                            local distance = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)).Magnitude
-                            if distance < closestDistance then
-                                closestPlayer = humanoidRootPart
-                                closestDistance = distance
-                            end
-                        end
+    
+    -- Aimbot suave (segura botão direito)
+    if getgenv().Aimbot and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        local closest = nil
+        local closestDist = 300
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") then
+                local head = plr.Character.Head
+                local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                if onScreen then
+                    local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+                    if dist < closestDist then
+                        closest = head
+                        closestDist = dist
                     end
                 end
             end
-
-            if closestPlayer then
-                camera.CFrame = CFrame.lookAt(camera.CFrame.Position, closestPlayer.Position)
-            end
         end
-    end)
-end
-
--- ===== FUNÇÃO: BOTÃO DE MINIMIZAR =====
-local function toggleMinimize()
-    MINIMIZADO = not MINIMIZADO
-    if MINIMIZADO then
-        for _, obj in ipairs(Drawing.getObjects()) do
-            obj.Visible = false
+        if closest then
+            Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, closest.Position), 0.2)
         end
-        AIMBOT_ATIVO = false
-        setfpscap(60) -- Volta ao FPS normal
-    else
-        enableESP()
-        enableAimbot()
-        setLowRender()
-        AIMBOT_ATIVO = true
     end
-end
-
--- ===== ATALHO PARA MINIMIZAR (TECLA "P") =====
-game:GetService("UserInputService").InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.P then
-        toggleMinimize()
+    
+    -- Fly
+    if getgenv().Fly and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local root = LocalPlayer.Character.HumanoidRootPart
+        local moveDir = Vector3.new(0,0,0)
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + Camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - Camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - Camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + Camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir = moveDir - Vector3.new(0,1,0) end
+        
+        BodyVelocity.Velocity = moveDir.Unit * getgenv().Speed
+        BodyGyro.CFrame = Camera.CFrame
     end
 end)
 
--- ===== INICIALIZAÇÃO =====
-setLowRender()
-enableESP()
-enableAimbot()
+UserInputService.InputBegan:Connect(function(key)
+    if key.KeyCode == Enum.KeyCode.F then
+        getgenv().ESP = not getgenv().ESP
+        getgenv().Aimbot = not getgenv().Aimbot
+        getgenv().Fly = not getgenv().Fly
+        print("Hacks toggled → ESP:", getgenv().ESP, "Aimbot:", getgenv().Aimbot, "Fly:", getgenv().Fly)
+    end
+end)
 
--- ===== COMANDO PARA GITHUB (SALVAR SEU SCRIPT) =====
--- 1. Crie um repositório no GitHub pelo seu navegador.
--- 2. Faça upload deste script manualmente ou use:
---    git add roblox_hack.lua
---    git commit -m "Script Roblox Universal"
---    git push origin main
+print("SCRIPT 2025 CARREGADO – APERTE F PRA TOGGLAR")

@@ -1,72 +1,131 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield.lua'))()
-
-local Window = Rayfield:CreateWindow({
-   Name = "BILL HUB 2025 - VILA EDITION",
-   LoadingTitle = "Carregando o melhor hack do planeta",
-   LoadingSubtitle = "by Bill - o rei dos cheats",
-   KeySystem = false
-})
-
-getgenv().Aim = {Enabled = true, WallCheck = true, Prediction = true, FOV = 120, Smoothness = 0.11}
-getgenv().ESP = {Enabled = true}
-getgenv().Fly = {Enabled = false, Speed = 100}
-getgenv().Speed = {Value = 16}
-getgenv().Noclip = false
+local Window = Rayfield:CreateWindow({Name = "BILL REVENGE AIMBOT 2025", KeySystem = false})
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
+-- Configs
+getgenv().Aimbot = {
+    Enabled = true,
+    Prediction = true,
+    WallCheck = true,
+    FOV = 180,
+    Smoothness = 0.09,
+    PriorityAttacker = true,   -- quem te deu dano vira alvo automático
+    KeyToggle = Enum.KeyCode.E
+}
+
+-- Variáveis
+local Target = nil
+local LastAttacker = nil
+local Highlight = Instance.new("Highlight")
+Highlight.FillColor = Color3.fromRGB(255,0,0)
+Highlight.OutlineColor = Color3.fromRGB(255,255,255)
+Highlight.FillTransparency = 0.3
+Highlight.OutlineTransparency = 0
+Highlight.Parent = game.CoreGui
+
 -- FOV Circle
-local FOV = Drawing.new("Circle")
-FOV.Radius = getgenv().Aim.FOV
-FOV.Color = Color3.fromRGB(255,0,255)
-FOV.Thickness = 2
-FOV.Filled = false
-FOV.Visible = true
+local Circle = Drawing.new("Circle")
+Circle.Radius = getgenv().Aimbot.FOV
+Circle.Color = Color3.fromRGB(255,0,255)
+Circle.Thickness = 2
+Circle.Filled = false
+Circle.Visible = true
 
--- Aimbot principal
-RunService.Heartbeat:Connect(function()
-   FOV.Position = UserInputService:GetMouseLocation()
-   FOV.Radius = getgenv().Aim.FOV
-
-   if getgenv().Aim.Enabled then
-      local closest = nil
-      local dist = math.huge
-      for _, plr in pairs(Players:GetPlayers()) do
-         if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") then
-            local head = plr.Character.Head
-            local pos, onScreen = Camera:WorldToViewportPoint(head.Position + (head.Velocity * 0.165 if getgenv().Aim.Prediction else Vector3.new()))
-            local mag = (Vector2.new(pos.X, pos.Y) - UserInputService:GetMouseLocation()).Magnitude
-            
-            if onScreen and mag < dist and mag < getgenv().Aim.FOV then
-               if not getgenv().Aim.WallCheck or #Camera:GetPartsObscuringTarget({head.Position}, {LocalPlayer.Character, plr.Character}) == 0 then
-                  closest = head
-                  dist = mag
-               end
+-- Detecta quem te bateu
+local function SetupDamageDetection()
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.HealthChanged:Connect(function(health)
+            if health < LocalPlayer.Character.Humanoid.MaxHealth then
+                local creator = LocalPlayer.Character.Humanoid:FindFirstChild("creator")
+                if creator and creator.Value and creator.Value:IsA("Player") then
+                    LastAttacker = creator.Value
+                    if getgenv().Aimbot.Enabled and getgenv().Aimbot.PriorityAttacker then
+                        Target = LastAttacker.Character
+                    end
+                end
             end
-         end
-      end
-      if closest then
-         Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, closest.Position), getgenv().Aim.Smoothness)
-      end
-   end
+        end)
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(SetupDamageDetection)
+if LocalPlayer.Character then SetupDamageDetection() end
+
+-- Pega alvo mais próximo ou atacante
+local function GetTarget()
+    if LastAttacker and getgenv().Aimbot.PriorityAttacker and LastAttacker.Character and LastAttacker.Character:FindFirstChild("Head") then
+        local head = LastAttacker.Character.Head
+        local pos = Camera:WorldToViewportPoint(head.Position)
+        if pos.Z > 0 and (Vector2.new(pos.X, pos.Y) - UserInputService:GetMouseLocation()).Magnitude <= getgenv().Aimbot.FOV then
+            return head
+        end
+    end
+
+    local closest = nil
+    local best = math.huge
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") then
+            local head = plr.Character.Head
+            local vec, onScreen = Camera:WorldToViewportPoint(head.Position)
+            if onScreen then
+                local dist = (Vector2.new(vec.X, vec.Y) - UserInputService:GetMouseLocation()).Magnitude
+                if dist < best and dist <= getgenv().Aimbot.FOV then
+                    if not getgenv().Aimbot.WallCheck or #Camera:GetPartsObscuringTarget({head.Position}, {LocalPlayer.Character, plr.Character}) == 0 then
+                        best = dist
+                        closest = head
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- Loop principal
+RunService.Heartbeat:Connect(function()
+    Circle.Position = UserInputService:GetMouseLocation()
+    Circle.Radius = getgenv().Aimbot.FOV
+
+    if getgenv().Aimbot.Enabled then
+        local head = GetTarget()
+        if head then
+            Target = head.Parent
+            Highlight.Adornee = Target
+            Highlight.Enabled = true
+
+            local predict = getgenv().Aimbot.Prediction and head.Velocity * 0.165 or Vector3.new()
+            local targetPos = head.Position + predict
+            Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, targetPos), getgenv().Aimbot.Smoothness)
+        else
+            Highlight.Enabled = false
+        end
+    else
+        Highlight.Enabled = false
+    end
 end)
 
--- GUI
-Window:CreateTab("Aimbot"):CreateToggle({Name="Aimbot", CurrentValue=true, Callback=function(v) getgenv().Aim.Enabled = v end})
-Window:CreateTab("Aimbot"):CreateToggle({Name="WallCheck", CurrentValue=true, Callback=function(v) getgenv().Aim.WallCheck = v end})
-Window:CreateTab("Aimbot"):CreateToggle({Name="Prediction", CurrentValue=true, Callback=function(v) getgenv().Aim.Prediction = v end})
-Window:CreateTab("Aimbot"):CreateSlider({Name="FOV", Min=10, Max=360, CurrentValue=120, Callback=function(v) getgenv().Aim.FOV = v end})
-Window:CreateTab("Aimbot"):CreateSlider({Name="Smoothness", Min=0.01, Max=1, CurrentValue=0.11, Callback=function(v) getgenv().Aim.Smoothness = v end})
+-- GUI Rayfield
+local Tab = Window:CreateTab("Revenge Aimbot")
+Tab:CreateToggle({Name = "Aimbot Ativado", CurrentValue = true, Callback = function(v) getgenv().Aimbot.Enabled = v end})
+Tab:CreateToggle({Name = "Priorizar quem me bateu", CurrentValue = true, Callback = function(v) getgenv().Aimbot.PriorityAttacker = v end})
+Tab:CreateToggle({Name = "WallCheck", CurrentValue = true, Callback = function(v) getgenv().Aimbot.WallCheck = v end})
+Tab:CreateToggle({Name = "Prediction", CurrentValue = true, Callback = function(v) getgenv().Aimbot.Prediction = v end})
+Tab:CreateSlider({Name = "FOV", Min = 30, Max = 500, CurrentValue = 180, Callback = function(v) getgenv().Aimbot.FOV = v end})
+Tab:CreateSlider({Name = "Suavidade", Min = 0.01, Max = 0.5, Increment = 0.01, CurrentValue = 0.09, Callback = function(v) getgenv().Aimbot.Smoothness = v end})
 
-Window:CreateTab("Visual"):CreateToggle({Name="ESP", CurrentValue=true, Callback=function(v) getgenv().ESP.Enabled = v end})
+Rayfield:Notify({Title="BILL REVENGE AIMBOT", Content="Carregado! Tecla E ou F1", Duration=6})
 
-Window:CreateTab("Movement"):CreateToggle({Name="Fly (C)", CurrentValue=false, Callback=function(v) getgenv().Fly.Enabled = v end})
-Window:CreateTab("Movement"):CreateSlider({Name="Fly Speed", Min=16, Max=300, CurrentValue=100, Callback=function(v) getgenv().Fly.Speed = v end})
-Window:CreateTab("Movement"):CreateToggle({Name="Noclip", CurrentValue=false, Callback=function(v) getgenv().Noclip = v end})
-Window:CreateTab("Movement"):CreateSlider({Name="WalkSpeed", Min=16, Max=300, CurrentValue=16, Callback=function(v) getgenv().Speed.Value = v; if LocalPlayer.Character then LocalPlayer.Character.Humanoid.WalkSpeed = v end end})
+-- Toggle com tecla E
+UserInputService.InputBegan:Connect(function(i)
+    if i.KeyCode == getgenv().Aimbot.KeyToggle then
+        getgenv().Aimbot.Enabled = not getgenv().Aimbot.Enabled
+        Rayfield:Notify({Title="Aimbot", Content=getgenv().Aimbot.Enabled and "LIGADO" or "DESLIGADO"})
+    end
+end)
 
-Rayfield:Notify({Title="BILL HUB 2025", Content="Aimbot, ESP, Fly, tudo funcionando. F1 pra abrir de novo.", Duration=8})
-print("BILL HUB CARREGADO - VILA EDITION 2025")
+print("BILL REVENGE AIMBOT 2025 CARREGADO - REVENGE MODE ON")

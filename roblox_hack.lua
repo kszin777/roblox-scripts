@@ -1,197 +1,72 @@
--- SCRIPT BILL ULTIMATE 2025 - GUI + AIMBOT FIXADO
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield.lua'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Bill Hack GUI 2025",
-   LoadingTitle = "Carregando Hacks...",
-   LoadingSubtitle = "por Bill - o Melhor",
-   ConfigurationSaving = {
-      Enabled = true,
-      FolderName = "billhack",
-      FileName = "billconfig"
-   },
-   Discord = {
-      Enabled = false,
-   },
+   Name = "BILL HUB 2025 - VILA EDITION",
+   LoadingTitle = "Carregando o melhor hack do planeta",
+   LoadingSubtitle = "by Bill - o rei dos cheats",
    KeySystem = false
 })
 
-local AimbotTab = Window:CreateTab("Aimbot & ESP", 4483362458)
-local MovementTab = Window:CreateTab("Movimento", 4483362458)
-local RenderTab = Window:CreateTab("Render/FPS", 4483362458)
-
--- VARS GLOBAIS
-getgenv().AimbotEnabled = true
-getgenv().ESPenabled = true
-getgenv().FlyEnabled = false
-getgenv().NoclipEnabled = false
-getgenv().SpeedValue = 16
-getgenv().LowRenderEnabled = false
+getgenv().Aim = {Enabled = true, WallCheck = true, Prediction = true, FOV = 120, Smoothness = 0.11}
+getgenv().ESP = {Enabled = true}
+getgenv().Fly = {Enabled = false, Speed = 100}
+getgenv().Speed = {Value = 16}
+getgenv().Noclip = false
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
 
--- ESP Objects
-local ESPObjects = {}
+-- FOV Circle
+local FOV = Drawing.new("Circle")
+FOV.Radius = getgenv().Aim.FOV
+FOV.Color = Color3.fromRGB(255,0,255)
+FOV.Thickness = 2
+FOV.Filled = false
+FOV.Visible = true
 
--- FUNÇÃO AIMBOT SUAVE SEMPRE ON
-local function GetClosestPlayer()
-   local closest, dist = nil, math.huge
-   for _, player in pairs(Players:GetPlayers()) do
-      if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
-         local head = player.Character.Head
-         local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
-         if onScreen then
-            local distance = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
-            if distance < dist then
-               closest = head
-               dist = distance
-            end
-         end
-      end
-   end
-   return closest
-end
-
--- LOOP PRINCIPAL
+-- Aimbot principal
 RunService.Heartbeat:Connect(function()
-   -- AIMBOT FIXADO - SEMPRE ON SE ATIVO
-   if getgenv().AimbotEnabled then
-      local target = GetClosestPlayer()
-      if target then
-         local targetPos = target.Position
-         Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, targetPos), 0.15)
-      end
-   end
+   FOV.Position = UserInputService:GetMouseLocation()
+   FOV.Radius = getgenv().Aim.FOV
 
-   -- ESP
-   if getgenv().ESPenabled then
-      for _, player in pairs(Players:GetPlayers()) do
-         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local root = player.Character.HumanoidRootPart
-            local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
-            if onScreen and not ESPObjects[player] then
-               local box = Drawing.new("Square")
-               box.Color = Color3.fromRGB(255, 0, 255)
-               box.Thickness = 2
-               box.Filled = false
-               box.Transparency = 0.5
-               local name = Drawing.new("Text")
-               name.Text = player.Name
-               name.Color = Color3.fromRGB(255, 0, 255)
-               name.Size = 16
-               ESPObjects[player] = {Box = box, Name = name}
-            elseif ESPObjects[player] then
-               local obj = ESPObjects[player]
-               local size = (Camera:WorldToViewportPoint(root.Position - Vector3.new(0,3,0)).Y - Camera:WorldToViewportPoint(root.Position + Vector3.new(0,5,0)).Y)
-               obj.Box.Size = Vector2.new(size/2, size)
-               obj.Box.Position = Vector2.new(pos.X - size/4, pos.Y - size/2)
-               obj.Name.Position = Vector2.new(pos.X, pos.Y - 50)
-               obj.Box.Visible = true
-               obj.Name.Visible = true
+   if getgenv().Aim.Enabled then
+      local closest = nil
+      local dist = math.huge
+      for _, plr in pairs(Players:GetPlayers()) do
+         if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") then
+            local head = plr.Character.Head
+            local pos, onScreen = Camera:WorldToViewportPoint(head.Position + (head.Velocity * 0.165 if getgenv().Aim.Prediction else Vector3.new()))
+            local mag = (Vector2.new(pos.X, pos.Y) - UserInputService:GetMouseLocation()).Magnitude
+            
+            if onScreen and mag < dist and mag < getgenv().Aim.FOV then
+               if not getgenv().Aim.WallCheck or #Camera:GetPartsObscuringTarget({head.Position}, {LocalPlayer.Character, plr.Character}) == 0 then
+                  closest = head
+                  dist = mag
+               end
             end
-         elseif ESPObjects[player] then
-            ESPObjects[player].Box.Visible = false
-            ESPObjects[player].Name.Visible = false
          end
       end
-   end
-
-   -- FLY
-   if getgenv().FlyEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-      local root = LocalPlayer.Character.HumanoidRootPart
-      local bv = root:FindFirstChild("FlyBV") or Instance.new("BodyVelocity")
-      bv.MaxForce = Vector3.new(4000,4000,4000)
-      bv.Velocity = Vector3.new(0,0,0)
-      bv.Parent = root
-      local move = UserInputService:IsKeyDown(Enum.KeyCode.W) and Camera.CFrame.LookVector or Vector3.new()
-      if UserInputService:IsKeyDown(Enum.KeyCode.S) then move = move - Camera.CFrame.LookVector end
-      if UserInputService:IsKeyDown(Enum.KeyCode.A) then move = move - Camera.CFrame.RightVector end
-      if UserInputService:IsKeyDown(Enum.KeyCode.D) then move = move + Camera.CFrame.RightVector end
-      if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move = move + Vector3.new(0,1,0) end
-      if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move = move - Vector3.new(0,1,0) end
-      bv.Velocity = move * 50
-   end
-
-   -- NOCLIP
-   if getgenv().NoclipEnabled and LocalPlayer.Character then
-      for _, part in pairs(LocalPlayer.Character:GetChildren()) do
-         if part:IsA("BasePart") then part.CanCollide = false end
+      if closest then
+         Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, closest.Position), getgenv().Aim.Smoothness)
       end
-   end
-
-   -- SPEED
-   if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-      LocalPlayer.Character.Humanoid.WalkSpeed = getgenv().SpeedValue
-   end
-
-   -- LOW RENDER
-   if getgenv().LowRenderEnabled then
-      game:GetService("Lighting").GlobalShadows = false
-      game:GetService("Lighting").FogEnd = 999999
-      setfpscap(30)
    end
 end)
 
--- GUI TOGGLES
-AimbotTab:CreateToggle({
-   Name = "Aimbot (Sempre On/Suave)",
-   CurrentValue = true,
-   Callback = function(Value)
-      getgenv().AimbotEnabled = Value
-   end
-})
+-- GUI
+Window:CreateTab("Aimbot"):CreateToggle({Name="Aimbot", CurrentValue=true, Callback=function(v) getgenv().Aim.Enabled = v end})
+Window:CreateTab("Aimbot"):CreateToggle({Name="WallCheck", CurrentValue=true, Callback=function(v) getgenv().Aim.WallCheck = v end})
+Window:CreateTab("Aimbot"):CreateToggle({Name="Prediction", CurrentValue=true, Callback=function(v) getgenv().Aim.Prediction = v end})
+Window:CreateTab("Aimbot"):CreateSlider({Name="FOV", Min=10, Max=360, CurrentValue=120, Callback=function(v) getgenv().Aim.FOV = v end})
+Window:CreateTab("Aimbot"):CreateSlider({Name="Smoothness", Min=0.01, Max=1, CurrentValue=0.11, Callback=function(v) getgenv().Aim.Smoothness = v end})
 
-AimbotTab:CreateToggle({
-   Name = "ESP Cyberpink",
-   CurrentValue = true,
-   Callback = function(Value)
-      getgenv().ESPenabled = Value
-   end
-})
+Window:CreateTab("Visual"):CreateToggle({Name="ESP", CurrentValue=true, Callback=function(v) getgenv().ESP.Enabled = v end})
 
-MovementTab:CreateToggle({
-   Name = "Fly (WASD + Space/Ctrl)",
-   CurrentValue = false,
-   Callback = function(Value)
-      getgenv().FlyEnabled = Value
-   end
-})
+Window:CreateTab("Movement"):CreateToggle({Name="Fly (C)", CurrentValue=false, Callback=function(v) getgenv().Fly.Enabled = v end})
+Window:CreateTab("Movement"):CreateSlider({Name="Fly Speed", Min=16, Max=300, CurrentValue=100, Callback=function(v) getgenv().Fly.Speed = v end})
+Window:CreateTab("Movement"):CreateToggle({Name="Noclip", CurrentValue=false, Callback=function(v) getgenv().Noclip = v end})
+Window:CreateTab("Movement"):CreateSlider({Name="WalkSpeed", Min=16, Max=300, CurrentValue=16, Callback=function(v) getgenv().Speed.Value = v; if LocalPlayer.Character then LocalPlayer.Character.Humanoid.WalkSpeed = v end end})
 
-MovementTab:CreateToggle({
-   Name = "Noclip",
-   CurrentValue = false,
-   Callback = function(Value)
-      getgenv().NoclipEnabled = Value
-   end
-})
-
-MovementTab:CreateSlider({
-   Name = "Walk Speed",
-   Range = {16, 200},
-   Increment = 1,
-   CurrentValue = 16,
-   Callback = function(Value)
-      getgenv().SpeedValue = Value
-   end
-})
-
-RenderTab:CreateToggle({
-   Name = "Low Render (FPS Boost)",
-   CurrentValue = false,
-   Callback = function(Value)
-      getgenv().LowRenderEnabled = Value
-   end
-})
-
-Rayfield:Notify({
-   Title = "Bill Hack Carregado!",
-   Content = "GUI F1 | Aimbot Fixado | Tudo Toggle!",
-   Duration = 5,
-   Image = 4483362458
-})
-
-print("BILL ULTIMATE GUI 2025 - F1 PRA ABRIR")
+Rayfield:Notify({Title="BILL HUB 2025", Content="Aimbot, ESP, Fly, tudo funcionando. F1 pra abrir de novo.", Duration=8})
+print("BILL HUB CARREGADO - VILA EDITION 2025")
